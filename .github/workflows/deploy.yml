@@ -42,6 +42,18 @@ jobs:
       - name: Build React Vite
         run: npm run build
 
+        
+      - name: Verify GitHub Pages paths
+        run: |
+          echo "Checking generated index.html"
+          cat dist/index.html
+
+          echo "Validating asset base path"
+          grep -q '/MoviMexa/assets/' dist/index.html
+
+          echo "Build paths validated"
+
+
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v6
 
