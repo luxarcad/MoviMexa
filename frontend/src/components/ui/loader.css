@@ -1,0 +1,46 @@
+.mm-loader {
+  --loader-size: 112px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px 20px;
+  color: #fafaf9;
+  text-align: center;
+}
+
+.mm-loader--sm { --loader-size: 72px; gap: 12px; }
+.mm-loader--lg { --loader-size: 144px; gap: 24px; }
+.mm-loader__rings { position: relative; width: var(--loader-size); height: var(--loader-size); }
+.mm-loader__ring { position: absolute; inset: 0; border-radius: 50%; animation: mm-loader-turn 3s linear infinite; }
+.mm-loader__ring--one {
+  background: conic-gradient(transparent 0deg, #e5e4e2 110deg, transparent 200deg);
+  mask: radial-gradient(circle, transparent 35%, #000 37%, #000 39%, transparent 41%);
+}
+.mm-loader__ring--two {
+  background: conic-gradient(transparent 0deg, #fafaf9 120deg, #a8a59e 235deg, transparent 360deg);
+  mask: radial-gradient(circle, transparent 43%, #000 45%, #000 48%, transparent 50%);
+  animation-duration: 2.5s;
+}
+.mm-loader__ring--three {
+  background: conic-gradient(from 180deg, transparent 0deg, #a8a59e 70deg, transparent 130deg);
+  mask: radial-gradient(circle, transparent 53%, #000 55%, #000 57%, transparent 59%);
+  animation-direction: reverse;
+  animation-duration: 4s;
+  opacity: .65;
+}
+.mm-loader__ring--four {
+  background: conic-gradient(from 270deg, transparent 0deg, #d6d5d1 22deg, transparent 45deg);
+  mask: radial-gradient(circle, transparent 62%, #000 63%, #000 64%, transparent 65%);
+  animation-duration: 3.5s;
+}
+.mm-loader__center { position: absolute; inset: 46%; border-radius: 50%; background: #e5e4e2; box-shadow: 0 0 16px #e5e4e222; }
+.mm-loader__copy { max-width: 300px; }
+.mm-loader__title { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.025em; line-height: 1.4; }
+.mm-loader__subtitle { margin: 8px 0 0; color: #a8a59e; font-size: 13px; line-height: 1.6; }
+.mm-loader--sm .mm-loader__title { font-size: 14px; }
+.mm-loader--sm .mm-loader__subtitle { font-size: 12px; }
+.mm-loader--lg .mm-loader__title { font-size: 20px; }
+@keyframes mm-loader-turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .mm-loader__ring { animation: none; } }

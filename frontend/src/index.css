@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;650;700;800&display=swap');
+
+:root {
+  font-family: 'Manrope', 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #e5e4e2;
+  background: #1c1b17;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
+  --mercury-50: #fafaf9;
+  --mercury-100: #f5f5f4;
+  --mercury-200: #e5e4e2;
+  --mercury-300: #d6d5d1;
+  --mercury-400: #a8a59e;
+  --mercury-500: #78756c;
+  --mercury-600: #57564e;
+  --mercury-700: #44433c;
+  --mercury-800: #292724;
+  --mercury-900: #1c1b17;
+  --text: #e5e4e2;
+  --muted: #a8a59e;
+  --line: #44433c;
+  --surface: #292724;
+  --shadow-soft: 7px 7px 19px #11110e55, -3px -3px 12px #ffffff05;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { min-width: 320px; scroll-behavior: smooth; scrollbar-color: #57564e #1c1b17; scrollbar-width: thin; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+#root { min-height: 100vh; }
+button, input, select, textarea { font: inherit; }
+button, input, select, textarea, a { -webkit-tap-highlight-color: transparent; }
+button { color: inherit; cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+button, a, input, select, textarea { outline-offset: 4px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid #e5e4e2; }
+a { color: inherit; text-decoration: none; }
+svg { flex-shrink: 0; vertical-align: middle; }
+img, svg { max-width: 100%; }
+button > svg { pointer-events: none; }
+input, select, textarea { min-width: 0; }
+input::placeholder, textarea::placeholder { color: #a8a59e; opacity: 1; }
+input[type='checkbox'], input[type='radio'] { accent-color: #d6d5d1; }
+::selection { color: #1c1b17; background: #d6d5d1; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.sr-only:focus, .sr-only:focus-within { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip-path: none; white-space: normal; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
