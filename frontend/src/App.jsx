@@ -46,6 +46,7 @@ function clockAt(seconds, baseTime) {
   return new Intl.DateTimeFormat("es-MX", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
     timeZone: "America/Mexico_City",
   }).format(new Date(baseTime + seconds * 1000));
 }
@@ -181,7 +182,12 @@ export default function App() {
     }
     setSelectedId(value.id);
     setStopIndex(0);
-    setView("trip");
+    if (!filteredRoutes.some((item) => item.id === value.id)) {
+      setFilter({ origin: "", destination: "" });
+      setOrigin("");
+      setDestination("");
+    }
+    navigate("trip");
   }
   function favorite(id) {
     const saved = favoriteIds.includes(id);
@@ -278,6 +284,7 @@ export default function App() {
                 route={ROUTES[0]}
                 stopIndex={1}
                 onStopChange={() => {}}
+                interactive={false}
               />
               <div className="welcome-eta">
                 <span className="bus-icon">
@@ -335,6 +342,8 @@ export default function App() {
             <button
               key={key}
               className={`nav-item ${view === key ? "active" : ""}`}
+              aria-label={label}
+              title={label}
               onClick={() => navigate(key)}
               aria-current={view === key ? "page" : undefined}
             >
@@ -360,6 +369,8 @@ export default function App() {
           </div>
           <button
             className={`nav-item ${view === "help" ? "active" : ""}`}
+            aria-label="Centro de ayuda"
+            title="Centro de ayuda"
             onClick={() => navigate("help")}
           >
             <Icon name="help" />
@@ -367,6 +378,8 @@ export default function App() {
           </button>
           <button
             className="profile-button"
+            aria-label="Mi perfil"
+            title="Mi perfil"
             onClick={() => navigate("profile")}
           >
             <span className="avatar">

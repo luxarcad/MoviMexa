@@ -27,6 +27,7 @@ export default function RouteMap({
   fleet,
   tracking,
   phase,
+  interactive = true,
 }) {
   const id = useId().replaceAll(":", "");
   const [zoom, setZoom] = useState(1);
@@ -117,12 +118,12 @@ export default function RouteMap({
           {POINTS.map(([x, y], i) => (
             <g
               key={i}
-              role={!tracking && i < 5 ? "button" : undefined}
-              tabIndex={!tracking && i < 5 ? 0 : undefined}
+              role={interactive && !tracking && i < 5 ? "button" : undefined}
+              tabIndex={interactive && !tracking && i < 5 ? 0 : undefined}
               aria-label={`Elegir ${route.stops[i].name}`}
-              onClick={() => !tracking && i < 5 && onStopChange(i)}
+              onClick={() => interactive && !tracking && i < 5 && onStopChange(i)}
               onKeyDown={(event) => {
-                if (!tracking && i < 5 && ["Enter", " "].includes(event.key)) {
+                if (interactive && !tracking && i < 5 && ["Enter", " "].includes(event.key)) {
                   event.preventDefault();
                   onStopChange(i);
                 }
@@ -218,7 +219,7 @@ export default function RouteMap({
           Parada
         </span>
       </div>
-      <div className="map-controls">
+      {interactive && <div className="map-controls">
         <button
           className="icon-button"
           aria-label="Acercar mapa"
@@ -242,7 +243,7 @@ export default function RouteMap({
         >
           <Icon name="target" size={17} />
         </button>
-      </div>
+      </div>}
       <div className="map-bottom">
         <Icon name="pin" size={16} />
         <span>
