@@ -36,7 +36,7 @@ function Brand() {
         <Icon name="route" size={25} />
       </span>
       <span>
-        Movi<span className="brand-light">Mexa</span>
+        Movil<span className="brand-light">Tec</span>
         <small>TU CIUDAD, MÁS CERCA</small>
       </span>
     </div>
