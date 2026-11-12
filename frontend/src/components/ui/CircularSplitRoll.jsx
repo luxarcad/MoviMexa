@@ -4,7 +4,7 @@ import './circular-split-roll.css'
 function RouteTile({ number, variant }) {
   return (
     <div className={`mm-roll__tile mm-roll__tile--${variant % 3}`}>
-      <span className="mm-roll__tile-label">MOVIMEXA</span>
+      <span className="mm-roll__tile-label">MovilTec</span>
       <svg viewBox="0 0 160 108" fill="none" className="mm-roll__drawing">
         <path className="mm-roll__street" d="M-8 26H50L83 59H174M25-5V119M117-5V42L81 78V119M-8 92H170" />
         <path className="mm-roll__line" d="M26 80V40C26 34 32 28 38 28H79C86 28 91 34 91 41V67C91 74 96 80 103 80H133" />
