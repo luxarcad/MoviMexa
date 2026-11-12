@@ -417,7 +417,7 @@ export default function App() {
           </div>
         </div>
         <footer className="welcome-footer">
-          <span>MoviMexa © 2026</span>
+          <span>MovilTec © 2026</span>
           <span>Ciudad de México · Una forma más clara de moverte.</span>
         </footer>
       </main>
@@ -1222,7 +1222,7 @@ export default function App() {
             <>
               <PageHeading
                 title="Viaja con más claridad."
-                text="Todo lo que necesitas para probar MoviMexa."
+                text="Todo lo que necesitas para probar MovilTec."
                 headingRef={headingRef}
               />
               <div className="help-layout">
@@ -1458,7 +1458,7 @@ function PageHeading({ title, text, headingRef }) {
   return (
     <div className="page-heading">
       <div>
-        <span className="eyebrow">MOVIMEXA / TU MOVILIDAD COTIDIANA</span>
+        <span className="eyebrow">MovilTec / TU MOVILIDAD COTIDIANA</span>
         <h1 tabIndex={-1} ref={headingRef}>
           {title}
         </h1>
