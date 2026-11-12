@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import './auth.css'
 
-// Adapted from the supplied SignIn1 reference for the MoviMexa demo.
+// Adapted from the supplied SignIn1 reference for the MovilTec demo.
 export default function AuthPanel({ onComplete, onClose, initialMode = 'register', modal = false }) {
   const [mode, setMode] = useState(initialMode === 'login' ? 'login' : 'register')
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '', accepted: false })
@@ -98,8 +98,8 @@ export default function AuthPanel({ onComplete, onClose, initialMode = 'register
   return (
     <section className="auth-panel" role={modal ? 'dialog' : undefined} aria-modal={modal ? true : undefined} aria-labelledby={`${prefix}-title`} ref={panelRef} onKeyDown={handleKeyDown}>
       {onClose && <button type="button" className="auth-close" onClick={onClose} aria-label="Cerrar acceso"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>}
-      <aside className="auth-story" aria-label="Tu primer viaje en MoviMexa">
-        <div className="auth-brand"><span className="auth-brand-mark" aria-hidden="true">m<span>·</span></span><span>MoviMexa</span></div>
+      <aside className="auth-story" aria-label="Tu primer viaje en MovilTec">
+        <div className="auth-brand"><span className="auth-brand-mark" aria-hidden="true">m<span>·</span></span><span>MovilTec</span></div>
         <div className="auth-story-content">
           <span className="auth-eyebrow">MENOS DUDAS. MÁS CAMINO.</span>
           <h2>Tu ciudad.<br />A tu ritmo.</h2>

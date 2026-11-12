@@ -1,4 +1,4 @@
-/** Motor determinista del agente de MoviMexa. Todos los datos son simulados. */
+/** Motor determinista del agente de MovilTec. Todos los datos son simulados. */
 export const INCIDENT_TYPES = {
   delay: {
     title: "Unidad con retraso",
