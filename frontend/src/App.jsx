@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import Icon from "./components/Icon";
 import RouteMap from "./components/RouteMap";
+import AgentPanel from "./components/AgentPanel";
 import AuthPanel from "./components/ui/AuthPanel";
 import Loader from "./components/ui/Loader";
 import CircularSplitRoll from "./components/ui/CircularSplitRoll";
 import { ROUTES } from "./data/routes";
 import { getTripState, getFleetState, formatDuration } from "./lib/simulation";
 import { readLocal, writeLocal } from "./lib/storage";
+import { INCIDENT_TYPES, makeCandidates, rankCandidates, departureAdvice, mexicanTime } from "./lib/routeAgent";
 import "./App.css";
 
 const NAV = [
@@ -36,7 +38,7 @@ function Brand() {
         <Icon name="route" size={25} />
       </span>
       <span>
-        Movil<span className="brand-light">Tec</span>
+        Movi<span className="brand-light">Mexa</span>
         <small>TU CIUDAD, MÁS CERCA</small>
       </span>
     </div>
@@ -81,27 +83,46 @@ export default function App() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [storageIssue, setStorageIssue] = useState(false);
   const [alerts, setAlerts] = useState(true);
+  const [goal, setGoal] = useState(() => mexicanTime(Date.now() + 90 * 60_000));
+  const [autoAgent, setAutoAgent] = useState(true);
+  const [incidents, setIncidents] = useState([]);
+  const [selectedPlanId, setSelectedPlanId] = useState("direct");
+  const [agentMessages, setAgentMessages] = useState([]);
   const timer = useRef(null);
   const headingRef = useRef(null);
   const dialogRef = useRef(null);
   const route = ROUTES.find((r) => r.id === selectedId) || ROUTES[0];
+  const candidates = makeCandidates(route, stopIndex);
+  const ranking = rankCandidates(candidates, incidents, stopIndex);
+  const activePlanId = trip?.activePlanId || selectedPlanId;
+  const activePlan = candidates.find((item) => item.id === activePlanId) || candidates[0];
+  const activeScore = ranking.find((item) => item.id === activePlan.id);
+  const routeForTrip = {
+    ...activePlan.route,
+    wait: activeScore?.waitMinutes ?? activePlan.route.wait,
+    minutes: activePlan.route.minutes + (activeScore?.extraRide ?? 0),
+  };
+  const segmentStopIndex = trip?.segmentStopIndex ?? stopIndex;
+  const segmentElapsed = Math.max(0, (trip?.elapsed ?? 0) - (trip?.segmentStartedAt ?? 0));
   const state = getTripState({
-    route,
-    stopIndex,
-    elapsed: trip?.elapsed ?? 0,
-    delay: trip?.delay ?? 0,
+    route: routeForTrip,
+    stopIndex: segmentStopIndex,
+    elapsed: segmentElapsed,
   });
   const fleet = getFleetState({
-    route,
-    stopIndex,
-    elapsed: trip?.elapsed ?? 0,
-    delay: trip?.delay ?? 0,
+    route: routeForTrip,
+    stopIndex: segmentStopIndex,
+    elapsed: segmentElapsed,
   });
   const passengerProgress = Math.max(
     0,
-    (state.progress - route.stops[stopIndex].progress) /
-      (1 - route.stops[stopIndex].progress),
+    (state.progress - routeForTrip.stops[segmentStopIndex].progress) /
+      (1 - routeForTrip.stops[segmentStopIndex].progress),
   );
+  const simulationNow = trip ? trip.startedAt + trip.elapsed * 1000 : Date.now();
+  const remainingGoalMinutes = trip ? Math.ceil(state.remainingSeconds / 60) : ranking[0]?.totalMinutes;
+  const advice = departureAdvice(goal, remainingGoalMinutes, simulationNow);
+  const etaClock = trip ? mexicanTime(simulationNow + state.remainingSeconds * 1000) : null;
   const tracking = !!trip;
   const phase = tracking ? state.phase : "idle";
   const isArrived = phase === "arrived";
@@ -131,6 +152,31 @@ export default function App() {
     );
     return () => clearInterval(t);
   }, [tracking, paused, isArrived, speed]);
+  // El agente detecta una congestión a los cuatro minutos de reloj simulado.
+  useEffect(() => {
+    if (trip && autoAgent && !trip.autoTriggered && trip.elapsed >= 240 && !paused && state.phase !== "arrived") {
+      simulateIncident("traffic", true);
+      setTrip((current) => current ? { ...current, autoTriggered: true } : current);
+    }
+  }, [trip?.elapsed, trip?.autoTriggered, autoAgent, paused]);
+
+  // Si el usuario ya abordó, el cambio espera hasta la próxima parada.
+  useEffect(() => {
+    if (!trip?.pendingPlanId || state.phase === "arrived") return;
+    const target = routeForTrip.stops[trip.pendingStopIndex];
+    if (!target || state.progress < target.progress - 0.00001) return;
+    setSelectedPlanId(trip.pendingPlanId);
+    setTrip((current) => current?.pendingPlanId ? {
+      ...current,
+      activePlanId: current.pendingPlanId,
+      segmentStartedAt: current.elapsed,
+      segmentStopIndex: current.pendingStopIndex,
+      pendingPlanId: null,
+      pendingStopIndex: null,
+    } : current);
+    addAgentMessage("Cambio aplicado al llegar a la parada de conexión simulada.", "info", simulationNow);
+  }, [trip?.elapsed, trip?.pendingPlanId, state.progress]);
+
   useEffect(() => {
     if (!cancelOpen) return;
     const previous = document.activeElement;
@@ -158,6 +204,46 @@ export default function App() {
     };
   }, [cancelOpen]);
 
+  function addAgentMessage(text, type = "info", at = Date.now()) {
+    setAgentMessages((previous) => [{ id: crypto.randomUUID(), time: mexicanTime(at), text, type }, ...previous].slice(0, 10));
+  }
+  function simulateIncident(type, automatic = false) {
+    if (!INCIDENT_TYPES[type] || isArrived) return;
+    const event = { id: crypto.randomUUID(), type, planId: activePlanId };
+    const updated = [...incidents, event];
+    const next = rankCandidates(candidates, updated, stopIndex)[0];
+    setIncidents(updated);
+    const incidentText = `${automatic ? "Detección automática" : "Incidencia reportada"}: ${INCIDENT_TYPES[type].title} en ${activePlan.label}.`;
+    addAgentMessage(incidentText, "incident", simulationNow);
+    if (!next || !Number.isFinite(next.totalMinutes)) {
+      setPaused(true);
+      addAgentMessage("Todas las opciones evaluadas están bloqueadas. No podemos prometer una llegada a tiempo.", "incident", simulationNow);
+      if (alerts) setToast("Sin alternativa disponible. Consulta los avisos del agente.");
+      return;
+    }
+    if (next.id !== activePlanId) {
+      if (trip && (state.phase === "riding" || state.phase === "boarding")) {
+        const transferStop = Math.min(route.stops.length - 2, Math.max(segmentStopIndex + 1, Math.ceil(state.progress * (route.stops.length - 1))));
+        setTrip((current) => current ? { ...current, pendingPlanId: next.id, pendingStopIndex: transferStop } : current);
+        addAgentMessage(`Nueva ruta recomendada: ${next.label} (${next.totalMinutes} min estimados). Cambio programado en la siguiente parada simulada.`, "info", simulationNow);
+      } else {
+        setSelectedPlanId(next.id);
+        if (trip) setTrip((current) => current ? { ...current, activePlanId: next.id, pendingPlanId: null, pendingStopIndex: null } : current);
+        addAgentMessage(`Ruta recalculada automáticamente: ${next.label}. Nueva estimación: ${next.totalMinutes} min.`, "info", simulationNow);
+      }
+      if (alerts) setToast(`Agente: incidencia detectada. Alternativa: ${next.label}.`);
+    } else {
+      addAgentMessage(`Se mantiene ${next.label}: sigue siendo la opción más rápida (${next.totalMinutes} min).`, "info", simulationNow);
+      if (alerts) setToast("Incidencia registrada. El agente recalculó las estimaciones.");
+    }
+  }
+  function resetAgent() {
+    if (trip && state.phase !== "waiting") return;
+    setIncidents([]);
+    setSelectedPlanId("direct");
+    setTrip((current) => current ? { ...current, activePlanId: "direct", pendingPlanId: null, pendingStopIndex: null } : current);
+    addAgentMessage("Escenario reiniciado. Ruta original restaurada.", "info", simulationNow);
+  }
   function persist(key, value) {
     if (!writeLocal(key, value)) setStorageIssue(true);
   }
@@ -182,6 +268,9 @@ export default function App() {
     }
     setSelectedId(value.id);
     setStopIndex(0);
+    setIncidents([]);
+    setSelectedPlanId("direct");
+    setAgentMessages([]);
     if (!filteredRoutes.some((item) => item.id === value.id)) {
       setFilter({ origin: "", destination: "" });
       setOrigin("");
@@ -205,7 +294,8 @@ export default function App() {
   function startTrip() {
     setBusy(true);
     timer.current = setTimeout(() => {
-      setTrip({ elapsed: 0, delay: 0, startedAt: Date.now() });
+      setTrip({ elapsed: 0, startedAt: Date.now(), activePlanId: selectedPlanId, segmentStartedAt: 0, segmentStopIndex: stopIndex, autoTriggered: false });
+      addAgentMessage(`Seguimiento iniciado en ${activePlan.label}. El agente vigila el trayecto.`, "info");
       setPaused(false);
       setBusy(false);
       setToast(
@@ -222,6 +312,7 @@ export default function App() {
         origin: route.stops[stopIndex].name,
         date: trip.startedAt,
         minutes: Math.round(state.rideSeconds / 60),
+        planLabel: activePlan.label,
       },
       ...history,
     ].slice(0, 30);
@@ -242,6 +333,9 @@ export default function App() {
     if (match && !tracking) {
       setSelectedId(match.id);
       setStopIndex(0);
+      setIncidents([]);
+      setSelectedPlanId("direct");
+      setAgentMessages([]);
     }
   }
   const normalizedSearch = search
@@ -412,7 +506,7 @@ export default function App() {
               DEMO
             </span>
             <button
-              className={`icon-button notification-button ${tracking && alerts && (phase === "boarding" || isArrived) ? "has-notice" : ""}`}
+              className={`icon-button notification-button ${alerts && (agentMessages.length || (tracking && (phase === "boarding" || isArrived))) ? "has-notice" : ""}`}
               aria-label="Ver avisos del viaje"
               aria-expanded={notice}
               onClick={() => setNotice(!notice)}
@@ -423,17 +517,12 @@ export default function App() {
               <div className="notification-popover">
                 <strong>Avisos de tu viaje</strong>
                 <p>
-                  {!alerts
-                    ? "Los avisos visuales están desactivados en tu perfil."
-                    : !tracking
-                      ? "Inicia un seguimiento para recibir avisos dentro del demo."
-                      : phase === "boarding"
-                        ? "Tu unidad llegó a la parada. Es momento de abordar."
-                        : isArrived
-                          ? "Llegaste a tu destino. Finaliza para guardar tu viaje."
-                          : trip.delay
-                            ? "Demora simulada: 3 minutos adicionales antes de abordar."
-                            : "Tu viaje simulado avanza con normalidad."}
+                  {!alerts ? "Los avisos visuales están desactivados en tu perfil."
+                    : agentMessages.length ? agentMessages[0].text
+                    : !tracking ? "Elige una ruta e inicia la simulación del agente."
+                    : phase === "boarding" ? "Tu unidad llegó a la parada. Es momento de abordar."
+                    : isArrived ? "Llegaste a tu destino. Finaliza para guardar tu viaje."
+                    : "El agente supervisa tu trayecto simulado."}
                 </p>
                 <button
                   className="text-button"
@@ -637,9 +726,10 @@ export default function App() {
                       <span className="small-label">TU RUTA SELECCIONADA</span>
                       <h2>{route.destination}</h2>
                       <p>
-                        <span className="route-label">{route.id}</span>Desde{" "}
+                        <span className="route-label">{routeForTrip.id}</span>Desde{" "}
                         {route.origin}
                       </p>
+                      {activePlanId !== "direct" && <p className="agent-changed-label"><Icon name="swap" size={13} /> Desvío recomendado por el agente · Simulado</p>}
                     </div>
                     <button
                       className={`icon-button favorite-button ${favoriteIds.includes(route.id) ? "is-favorite" : ""}`}
@@ -654,10 +744,27 @@ export default function App() {
                       <Icon name="heart" />
                     </button>
                   </div>
+                  <AgentPanel
+                    goal={goal}
+                    onGoalChange={setGoal}
+                    ranking={ranking}
+                    activeId={activePlanId}
+                    advice={advice}
+                    etaClock={etaClock}
+                    pendingPlanId={trip?.pendingPlanId}
+                    onIncident={simulateIncident}
+                    onReset={resetAgent}
+                    autoAgent={autoAgent}
+                    onAutoAgentChange={setAutoAgent}
+                    messages={agentMessages}
+                    tracking={tracking}
+                    canReset={Boolean(incidents.length) && (!tracking || phase === "waiting")}
+                  />
                   <RouteMap
-                    route={route}
-                    stopIndex={stopIndex}
-                    onStopChange={setStopIndex}
+                    route={routeForTrip}
+                    planId={activePlanId}
+                    stopIndex={tracking ? segmentStopIndex : stopIndex}
+                    onStopChange={(value) => { setStopIndex(value); setIncidents([]); setSelectedPlanId("direct"); setAgentMessages([]); }}
                     progress={tracking ? state.progress : undefined}
                     fleet={tracking ? fleet : undefined}
                     tracking={tracking}
@@ -675,7 +782,7 @@ export default function App() {
                       <select
                         id="boarding-stop"
                         value={stopIndex}
-                        onChange={(e) => setStopIndex(Number(e.target.value))}
+                        onChange={(e) => { setStopIndex(Number(e.target.value)); setIncidents([]); setSelectedPlanId("direct"); setAgentMessages([]); }}
                         disabled={tracking}
                       >
                         {route.stops.slice(0, -1).map((s, i) => (
@@ -712,7 +819,7 @@ export default function App() {
                         <span>
                           {isArrived
                             ? "Viaje completado"
-                            : `Unidad MX-${route.id}1 · ${phase === "riding" ? "En camino" : "Tiempo estimado"}`}
+                            : `Unidad MX-${routeForTrip.id}1 · ${phase === "riding" ? "En camino" : "Tiempo estimado"}`}
                         </span>
                       </div>
                       <div className="arrival-spark">
@@ -769,9 +876,9 @@ export default function App() {
                               {phase === "waiting"
                                 ? formatDuration(state.arrivalSeconds)
                                 : isArrived
-                                  ? route.destination
-                                  : route.stops[state.nextStopIndex]?.name ||
-                                    route.destination}
+                                  ? routeForTrip.destination
+                                  : routeForTrip.stops[state.nextStopIndex]?.name ||
+                                    routeForTrip.destination}
                             </strong>
                           </div>
                           <div>
@@ -787,7 +894,7 @@ export default function App() {
                           <div>
                             <small>Unidad</small>
                             <strong>
-                              MX-{route.id}1 <span>· Demo</span>
+                                MX-{routeForTrip.id}1 <span>· Demo</span>
                             </strong>
                           </div>
                         </div>
@@ -832,11 +939,11 @@ export default function App() {
                               : "La unidad está en tu parada. El abordaje dura 30 segundos simulados."}
                           </div>
                         )}
-                        {trip.delay > 0 && (
+                        {incidents.length > 0 && (
                           <div className="delay-note">
                             <Icon name="alert" size={15} />
-                            Demora simulada de {Math.ceil(trip.delay / 60)} min
-                            aplicada al tiempo de espera.
+                            {incidents.length} incidencia(s) simulada(s). El agente ha recalculado el recorrido.
+                            {trip.pendingPlanId && " El desvío se activará en la siguiente parada."}
                           </div>
                         )}
                         <div className="simulation-controls">
@@ -874,22 +981,7 @@ export default function App() {
                               1 s = {speed} s de viaje
                             </span>
                           </div>
-                          <button
-                            className="text-button"
-                            onClick={() =>
-                              setTrip((t) => ({
-                                ...t,
-                                delay: t.delay
-                                  ? Math.max(0, t.elapsed - state.waitSeconds)
-                                  : 180,
-                              }))
-                            }
-                            disabled={phase !== "waiting"}
-                          >
-                            {trip.delay
-                              ? "Quitar demora"
-                              : "Simular demora +3 min"}
-                          </button>
+                          <span className="speed-hint">Las incidencias se simulan en el panel del agente.</span>
                         </div>
                         <div className="tracking-actions">
                           {isArrived ? (
@@ -914,7 +1006,7 @@ export default function App() {
                                   onClick={() =>
                                     setTrip((t) => ({
                                       ...t,
-                                      elapsed: state.waitSeconds + t.delay + 30,
+                                      elapsed: t.segmentStartedAt + state.waitSeconds + 30,
                                     }))
                                   }
                                 >
@@ -944,15 +1036,15 @@ export default function App() {
                               <Icon name="bus" size={17} />
                             </span>
                             <p>
-                              Unidad <strong>MX-{route.id}1</strong>
+                              Unidad <strong>MX-{routeForTrip.id}1</strong>
                               <small>
-                                {route.distance} km de ruta ilustrativa
+                                {routeForTrip.distance} km de ruta ilustrativa
                               </small>
                             </p>
                           </div>
                           <button
                             className="primary-button"
-                            disabled={!filteredRoutes.length}
+                            disabled={!filteredRoutes.length || !Number.isFinite(ranking[0]?.totalMinutes)}
                             onClick={startTrip}
                           >
                             Iniciar seguimiento
@@ -968,7 +1060,7 @@ export default function App() {
                 <div className="section-heading">
                   <div>
                     <h2>Siempre hay un siguiente camino</h2>
-                    <p>Próximas unidades en {route.stops[stopIndex].name}</p>
+                    <p>Próximas unidades en {routeForTrip.stops[segmentStopIndex].name}</p>
                   </div>
                   <span className="small-badge">ESTIMACIONES DEMO</span>
                 </div>
@@ -1097,7 +1189,7 @@ export default function App() {
                         </span>
                         <h2>{item.destination}</h2>
                         <p>
-                          Desde {item.origin} · {item.minutes} min de recorrido
+                          Desde {item.origin} · {item.minutes} min de recorrido{item.planLabel ? ` · ${item.planLabel}` : ""}
                         </p>
                       </div>
                       <button
@@ -1159,11 +1251,11 @@ export default function App() {
                     ],
                     [
                       "¿Cómo funciona la simulación?",
-                      "Al iniciar, el reloj avanza a velocidad ×30: cada segundo representa 30 segundos de viaje. Puedes cambiar a ×1 o ×60, pausar o añadir tres minutos de demora mientras esperas. La unidad pasa por espera, abordaje, recorrido y llegada.",
+                      "Al iniciar, el reloj avanza a velocidad ×30. El agente genera automáticamente una incidencia después de cuatro minutos simulados (si está activado). También puedes simular retrasos, tráfico o cierres desde el panel. Se comparan tres escenarios y se cambia el trayecto antes de abordar o en la siguiente parada simulada.",
                     ],
                     [
                       "¿Cómo se calcula el tiempo?",
-                      "La espera inicial y los intervalos entre unidades son valores de ejemplo. El recorrido usa una duración fija y divide el avance entre seis puntos. Elegir una parada intermedia reduce el tiempo restante de recorrido.",
+                      "El algoritmo suma caminata, espera, recorrido restante y penalizaciones de incidencias. Elige el tiempo más corto, descarta corredores cerrados y calcula una hora ideal de salida con 5 minutos de margen. Las conexiones y desvíos son ficticios.",
                     ],
                     [
                       "¿Qué guarda mi cuenta?",
@@ -1211,7 +1303,7 @@ export default function App() {
                 <div className="preference-row">
                   <div>
                     <h3>Avisos dentro de la app</h3>
-                    <p>Recibe un aviso al abordar y al llegar a tu destino.</p>
+                    <p>Recibe avisos de incidencias, cambios de ruta, abordaje y llegada dentro del demo.</p>
                   </div>
                   <button
                     className={`toggle ${alerts ? "on" : ""}`}

@@ -1,26 +1,26 @@
 import { useId, useState } from "react";
 import Icon from "./Icon";
 
-const POINTS = [
-  [110, 345],
-  [225, 345],
-  [315, 255],
-  [440, 255],
-  [535, 160],
-  [660, 160],
-];
-function pointAt(progress) {
+const POINTS = {
+  direct: [[110, 345], [225, 345], [315, 255], [440, 255], [535, 160], [660, 160]],
+  detour: [[110, 345], [207, 287], [325, 278], [433, 208], [548, 204], [660, 160]],
+  transfer: [[110, 345], [225, 345], [301, 376], [447, 306], [540, 241], [660, 160]],
+};
+function linePath(points) {
+  return points.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x} ${y}`).join(" ");
+}
+function pointAt(progress, points) {
   const part = Math.min(4.9999, Math.max(0, progress) * 5);
-  const i = Math.floor(part),
-    t = part - i;
+  const i = Math.floor(part), t = part - i;
   return [
-    POINTS[i][0] + (POINTS[i + 1][0] - POINTS[i][0]) * t,
-    POINTS[i][1] + (POINTS[i + 1][1] - POINTS[i][1]) * t,
+    points[i][0] + (points[i + 1][0] - points[i][0]) * t,
+    points[i][1] + (points[i + 1][1] - points[i][1]) * t,
   ];
 }
 
 export default function RouteMap({
   route,
+  planId = "direct",
   stopIndex,
   onStopChange,
   progress,
@@ -31,13 +31,15 @@ export default function RouteMap({
 }) {
   const id = useId().replaceAll(":", "");
   const [zoom, setZoom] = useState(1);
-  const position = pointAt(progress ?? 0.07);
+  const points = POINTS[planId] || POINTS.direct;
+  const path = linePath(points);
+  const position = pointAt(progress ?? 0.07, points);
   return (
-    <section className="map-panel" aria-label="Mapa esquemático de la ruta">
+    <section className={`map-panel ${planId !== "direct" ? "map-panel-alt" : ""}`} aria-label="Mapa esquemático de la ruta">
       <div className="map-top">
         <span className="map-tag">
           <span className="status-dot" />{" "}
-          {tracking ? "Seguimiento simulado" : "Vista de la ruta"}
+          {planId !== "direct" ? "Desvío simulado · Ruta recalculada" : tracking ? "Seguimiento simulado" : "Vista de la ruta"}
         </span>
         <span className="map-city">CIUDAD DE MÉXICO</span>
       </div>
@@ -100,22 +102,25 @@ export default function RouteMap({
           <text x="360" y="443" className="map-area">
             ZONA CENTRO
           </text>
+          {planId !== "direct" && (
+            <path d={linePath(POINTS.direct)} stroke="#bab9ad" strokeWidth="3" strokeDasharray="7 9" opacity=".35" fill="none" />
+          )}
           <path
-            d="M110 345H225L315 255H440L535 160H660"
-            stroke="#d6d5d1"
+            d={path}
+            stroke={planId === "direct" ? "#d6d5d1" : "#9ecfbf"}
             strokeWidth="15"
-            opacity=".15"
+            opacity=".18"
             fill="none"
             filter={`url(#${id}glow)`}
           />
           <path
-            d="M110 345H225L315 255H440L535 160H660"
-            stroke="#bab9ad"
+            d={path}
+            stroke={planId === "direct" ? "#bab9ad" : "#a6d9cc"}
             strokeWidth="5"
             strokeLinejoin="round"
             fill="none"
           />
-          {POINTS.map(([x, y], i) => (
+          {points.map(([x, y], i) => (
             <g
               key={i}
               role={interactive && !tracking && i < 5 ? "button" : undefined}
@@ -180,7 +185,7 @@ export default function RouteMap({
             />
           </g>
           {fleet?.slice(1).map((unit, i) => {
-            const [x, y] = pointAt(unit.state.progress);
+            const [x, y] = pointAt(unit.state.progress, points);
             return (
               <g key={unit.id}>
                 <title>
@@ -212,7 +217,7 @@ export default function RouteMap({
       <div className="map-key">
         <span>
           <i className="key-line" />
-          Recorrido
+          {planId === "direct" ? "Recorrido" : "Ruta alternativa"}
         </span>
         <span>
           <i className="key-dot" />
