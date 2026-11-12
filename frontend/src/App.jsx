@@ -38,7 +38,7 @@ function Brand() {
         <Icon name="route" size={25} />
       </span>
       <span>
-        Movi<span className="brand-light">Mexa</span>
+        Movil<span className="brand-light">Tec</span>
         <small>TU CIUDAD, MÁS CERCA</small>
       </span>
     </div>
@@ -152,15 +152,12 @@ export default function App() {
     );
     return () => clearInterval(t);
   }, [tracking, paused, isArrived, speed]);
-  // El agente detecta una congestión a los cuatro minutos de reloj simulado.
   useEffect(() => {
     if (trip && autoAgent && !trip.autoTriggered && trip.elapsed >= 240 && !paused && state.phase !== "arrived") {
       simulateIncident("traffic", true);
       setTrip((current) => current ? { ...current, autoTriggered: true } : current);
     }
   }, [trip?.elapsed, trip?.autoTriggered, autoAgent, paused]);
-
-  // Si el usuario ya abordó, el cambio espera hasta la próxima parada.
   useEffect(() => {
     if (!trip?.pendingPlanId || state.phase === "arrived") return;
     const target = routeForTrip.stops[trip.pendingStopIndex];
